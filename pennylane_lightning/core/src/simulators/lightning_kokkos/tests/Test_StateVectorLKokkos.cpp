@@ -309,3 +309,42 @@ TEMPLATE_TEST_CASE("StateVectorKokkos::StateVectorKokkos",
         // REQUIRE(sv.getDataVector() == approx(st_data));
     }
 }
+
+TEMPLATE_TEST_CASE("StateVectorKokkos::applyMidMeasureMP",
+                   "[StateVectorKokkos]", float, double) {
+    using PrecisionT = TestType;
+    using ComplexT = typename StateVectorKokkos<PrecisionT>::ComplexT;
+    using TestVectorT = TestVector<ComplexT>;
+
+    const std::size_t num_qubits = 3;
+
+    // TODO @tomlqc what about having same template for testing all Lightning
+    // flavours?
+
+    SECTION("Measure one of the qubits and collapse the state accordingly") {
+        const ComplexT coef{0.5, PrecisionT{0.0}};
+        const ComplexT isqr = INVSQRT2<PrecisionT>();
+        const ComplexT zero{PrecisionT{0.0}, PrecisionT{0.0}};
+
+        TestVectorT state_date = createZeroState<ComplexT>(num_qubits);
+        state_date = {coef, coef, coef, coef, zero, zero, zero, zero};
+        StateVectorKokkos<PrecisionT> sv(
+            reinterpret_cast<ComplexT *>(state_date.data()), state_date.size());
+
+        // sv.setSeed(1234); // TODO @tomlqc
+        std::size_t i_case = GENERATE(0);
+        std::vector<std::vector<std::size_t>> post_select({{}});
+        std::vector<int> reset({false});
+        std::size_t wire = GENERATE(0, 1);
+        std::vector<std::vector<int>> expected_samples({{0, 1}});
+        std::vector<std::vector<std::vector<ComplexT>>> expected_state = {
+            {// postselect -1, reset false
+             {coef, coef, coef, coef, zero, zero, zero, zero},
+             {zero, zero, isqr, isqr, zero, zero, zero, zero}}};
+        const std::vector<std::size_t> wires = {wire};
+        int sample =
+            sv.applyMidMeasureMP(wires, post_select[i_case], reset[i_case]);
+        REQUIRE(sample == expected_samples[i_case][wire]);
+        REQUIRE(sv.getDataVector() == expected_state[i_case][wire]);
+    }
+}

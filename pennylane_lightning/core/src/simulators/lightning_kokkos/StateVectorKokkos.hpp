@@ -759,6 +759,26 @@ class StateVectorKokkos final
     }
 
     /**
+     * @brief Apply a mid-circuit measurement.
+     *
+     * @param wires Wires to sample from.
+     * @param postselect Value to postselect (0 or 1) or empty to ignore
+     * @param reset Flag to reset wire to 0
+     */
+    inline auto
+    applyMidMeasureMP(const std::vector<std::size_t> &wires,
+                      const std::vector<std::size_t> &postselect = {},
+                      [[maybe_unused]] bool reset = false) -> int {
+        PL_ABORT_IF_NOT(wires.size() == 1,
+                        "MidMeasureMP should have a single wire.")
+        PL_ABORT_IF(postselect.size() > 1,
+                    "MidMeasureMP accepts at most one postselect value.")
+        int sample = -1;
+
+        return sample;
+    }
+
+    /**
      * @brief Update data of the class
      *
      * @param other Kokkos View
