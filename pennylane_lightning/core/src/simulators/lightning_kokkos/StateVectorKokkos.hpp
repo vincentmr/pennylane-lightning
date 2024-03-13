@@ -775,6 +775,8 @@ class StateVectorKokkos final
                     "MidMeasureMP accepts at most one postselect value.")
         int sample = -1;
 
+        // file:///home/thomas.germain/Downloads/KokkosTutorial_04_HierarchicalParallelism.pdf
+        // pp. 14, 20, 26,
         return sample;
     }
 
