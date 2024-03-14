@@ -310,7 +310,7 @@ TEMPLATE_TEST_CASE("StateVectorKokkos::StateVectorKokkos",
     }
 }
 
-TEMPLATE_TEST_CASE("StateVectorKokkos::applyMidMeasureMP",
+TEMPLATE_TEST_CASE("StateVectorKokkos::collapse",
                    "[StateVectorKokkos]", float, double) {
     using PrecisionT = TestType;
     using ComplexT = typename StateVectorKokkos<PrecisionT>::ComplexT;
@@ -321,30 +321,29 @@ TEMPLATE_TEST_CASE("StateVectorKokkos::applyMidMeasureMP",
     // TODO @tomlqc what about having same template for testing all Lightning
     // flavours?
 
-    SECTION("Measure one of the qubits and collapse the state accordingly") {
+    SECTION("Collapse the state vector as after having measured one of the "
+            "qubits.") {
+        TestVectorT init_state = createPlusState_<ComplexT>(num_qubits);
+
         const ComplexT coef{0.5, PrecisionT{0.0}};
-        const ComplexT isqr = INVSQRT2<PrecisionT>();
         const ComplexT zero{PrecisionT{0.0}, PrecisionT{0.0}};
 
-        TestVectorT state_date = createZeroState<ComplexT>(num_qubits);
-        state_date = {coef, coef, coef, coef, zero, zero, zero, zero};
-        StateVectorKokkos<PrecisionT> sv(
-            reinterpret_cast<ComplexT *>(state_date.data()), state_date.size());
-
-        // sv.setSeed(1234); // TODO @tomlqc
-        std::size_t i_case = GENERATE(0);
-        std::vector<std::vector<std::size_t>> post_select({{}});
-        std::vector<int> reset({false});
-        std::size_t wire = GENERATE(0, 1);
-        std::vector<std::vector<int>> expected_samples({{0, 1}});
         std::vector<std::vector<std::vector<ComplexT>>> expected_state = {
-            {// postselect -1, reset false
-             {coef, coef, coef, coef, zero, zero, zero, zero},
-             {zero, zero, isqr, isqr, zero, zero, zero, zero}}};
-        const std::vector<std::size_t> wires = {wire};
-        int sample =
-            sv.applyMidMeasureMP(wires, post_select[i_case], reset[i_case]);
-        REQUIRE(sample == expected_samples[i_case][wire]);
-        REQUIRE(sv.getDataVector() == expected_state[i_case][wire]);
+            {{coef, coef, coef, coef, zero, zero, zero, zero},
+             {coef, coef, zero, zero, coef, coef, zero, zero},
+             {coef, zero, coef, zero, coef, zero, coef, zero}},
+            {{zero, zero, zero, zero, coef, coef, coef, coef},
+             {zero, zero, coef, coef, zero, zero, coef, coef},
+             {zero, coef, zero, coef, zero, coef, zero, coef}},
+        };
+
+        std::size_t wire = GENERATE(0, 1, 2);
+        std::size_t branch = GENERATE(0, 1);
+        StateVectorKokkos<PrecisionT> sv(
+                reinterpret_cast<ComplexT *>(init_state.data()), init_state.size());
+        sv.collapse(wire, branch);
+
+        REQUIRE(sv.getDataVector() == expected_state[branch][wire]);
     }
 }
+

@@ -759,25 +759,18 @@ class StateVectorKokkos final
     }
 
     /**
-     * @brief Apply a mid-circuit measurement.
+     * @brief Collapse the state vector as after having measured one of the
+     * qubits.
      *
-     * @param wires Wires to sample from.
-     * @param postselect Value to postselect (0 or 1) or empty to ignore
-     * @param reset Flag to reset wire to 0
+     * The branch parameter imposes the measurement result on the given wire.
+     *
+     * @param wire Wire to collapse.
+     * @param branch Branch 0 or 1.
      */
-    inline auto
-    applyMidMeasureMP(const std::vector<std::size_t> &wires,
-                      const std::vector<std::size_t> &postselect = {},
-                      [[maybe_unused]] bool reset = false) -> int {
-        PL_ABORT_IF_NOT(wires.size() == 1,
-                        "MidMeasureMP should have a single wire.")
-        PL_ABORT_IF(postselect.size() > 1,
-                    "MidMeasureMP accepts at most one postselect value.")
-        int sample = -1;
+    void collapse([[maybe_unused]] const std::size_t wire, [[maybe_unused]] const bool branch) {
 
         // file:///home/thomas.germain/Downloads/KokkosTutorial_04_HierarchicalParallelism.pdf
         // pp. 14, 20, 26,
-        return sample;
     }
 
     /**
