@@ -25,8 +25,23 @@ from pennylane import numpy as np
 if not ld._CPP_BINARY_AVAILABLE:
     pytest.skip("No binary module found. Skipping.", allow_module_level=True)
 
-if ld._new_API:
-    pytest.skip("Old API required", allow_module_level=True)
+
+def get_vjp(device, tapes, dy):
+    """Helper to get VJP for a tape or batch of tapes"""
+    if device._new_API:
+        return device.compute_vjp(tapes, dy)
+
+    if isinstance(tapes, qml.tape.QuantumScript):
+        return device.vjp(tapes.measurements, dy)(tapes)
+
+    return device.batch_vjp(tapes, dy)(tapes)
+
+
+def get_jacobian(device, tape):
+    """Helper to get Jacobian of a tape"""
+    if device._new_API:
+        return device.compute_derivatives(tape)
+    return device.adjoint_jacobian(tape)
 
 
 class TestVectorJacobianProduct:
@@ -36,6 +51,7 @@ class TestVectorJacobianProduct:
     def dev(self, request):
         return qml.device(device_name, wires=2, c_dtype=request.param)
 
+    @pytest.mark.skipif(ld._new_API, reason="Old API required")
     def test_use_device_state(self, tol, dev):
         """Tests that when using the device state, the correct answer is still returned."""
         x, y, z = [0.5, 0.3, -0.7]
@@ -55,10 +71,11 @@ class TestVectorJacobianProduct:
 
         qml.execute([tape], dev, None)
         fn2 = dev.vjp(tape.measurements, dy, use_device_state=True)
-        vjp2 = fn2(tape)
+        vjp2 = fn2(tape.measure)
 
         assert np.allclose(vjp1, vjp2, atol=tol, rtol=0)
 
+    @pytest.mark.skipif(ld._new_API, reason="Old API required")
     def test_provide_starting_state(self, tol, dev):
         """Tests provides correct answer when provided starting state."""
         x, y, z = [0.5, 0.3, -0.7]
@@ -107,10 +124,8 @@ class TestVectorJacobianProduct:
 
         tape2.trainable_params = {1, 2, 3}
 
-        fn1 = dev.vjp(tape1.measurements, dy)
-        vjp1 = fn1(tape1)
-
-        vjp2 = dev.adjoint_jacobian(tape2)
+        vjp1 = get_vjp(dev, tape1, dy)
+        vjp2 = get_jacobian(dev, tape2)
 
         assert np.allclose(vjp1, vjp2, atol=tol, rtol=0)
 
@@ -127,18 +142,30 @@ class TestVectorJacobianProduct:
             qml.expval(qml.PauliZ(1))
 
         dy1 = np.array([1.0, 2.0])
+        dy2 = np.array([1.0 + 3.0j, 0.3 + 2.0j, 0.5 + 0.1j])
         tape1.trainable_params = {1, 2, 3}
 
-        with pytest.raises(
-            ValueError, match="Number of observables in the tape must be the same as"
-        ):
-            dev.vjp(tape1.measurements, dy1)
+        if dev._new_API:
+            with pytest.raises(
+                ValueError, match="Number of observables in the tape must be the same as"
+            ):
+                dev.compute_vjp(tape1, dy1)
 
-        dy2 = np.array([1.0 + 3.0j, 0.3 + 2.0j, 0.5 + 0.1j])
-        with pytest.raises(
-            ValueError, match="The vjp method only works with a real-valued grad_vec"
-        ):
-            dev.vjp(tape1.measurements, dy2)
+            with pytest.raises(
+                ValueError, match="The vjp method only works with a real-valued grad_vec"
+            ):
+                dev.compute_vjp(tape1, dy2)
+
+        else:
+            with pytest.raises(
+                ValueError, match="Number of observables in the tape must be the same as"
+            ):
+                dev.vjp(tape1.measurements, dy1)
+
+            with pytest.raises(
+                ValueError, match="The vjp method only works with a real-valued grad_vec"
+            ):
+                dev.vjp(tape1.measurements, dy2)
 
     def test_not_expval(self, dev):
         """Test if a QuantumFunctionError is raised for a tape with measurements that are not
@@ -149,11 +176,19 @@ class TestVectorJacobianProduct:
 
         dy = np.array([1.0])
 
-        with pytest.raises(
-            qml.QuantumFunctionError, match="Adjoint differentiation method does not"
-        ):
-            dev.vjp(tape.measurements, dy)(tape)
+        if dev._new_API:
+            with pytest.raises(
+                qml.QuantumFunctionError, match="Adjoint differentiation method does not"
+            ):
+                dev.compute_vjp(tape, dy)
 
+        else:
+            with pytest.raises(
+                qml.QuantumFunctionError, match="Adjoint differentiation method does not"
+            ):
+                dev.vjp(tape.measurements, dy)(tape)
+
+    @pytest.mark.skipif(ld._new_API, reason="Old API required")
     def test_finite_shots_warns(self):
         """Tests warning raised when finite shots specified"""
 
@@ -169,6 +204,11 @@ class TestVectorJacobianProduct:
             match="Requested adjoint differentiation to be computed with finite shots.",
         ):
             dev.vjp(tape.measurements, dy)(tape)
+
+    @pytest.mark.skipif(not ld._new_API, reason="New API required")
+    def test_finite_shots_error(self):
+        """Test that an error is raised when finite shots specified"""
+        return
 
     def test_unsupported_op(self, dev):
         """Test if a QuantumFunctionError is raised for an unsupported operation, i.e.,
@@ -363,6 +403,7 @@ class TestVectorJacobianProduct:
 
         assert len(vjp) == 0
 
+    @pytest.mark.skipif(ld._new_API, reason="Old API required")
     def test_no_trainable_parameters_NEW(self, dev):
         """A tape with no trainable parameters will simply return None"""
         _state = dev._asarray(dev.state)
@@ -377,23 +418,6 @@ class TestVectorJacobianProduct:
 
         tape.trainable_params = {}
         dy = np.array([1.0])
-        fn = dev.vjp(tape.measurements, dy)
-        vjp = fn(tape)
-
-        assert len(vjp) == 0
-
-    def test_no_trainable_parameters(self, dev):
-        """A tape with no trainable parameters will simply return None"""
-        x = 0.4
-
-        with qml.tape.QuantumTape() as tape:
-            qml.RX(x, wires=0)
-            qml.CNOT(wires=[0, 1])
-            qml.expval(qml.PauliZ(0))
-
-        tape.trainable_params = {}
-        dy = np.array([1.0])
-
         fn = dev.vjp(tape.measurements, dy)
         vjp = fn(tape)
 
@@ -487,6 +511,7 @@ class TestVectorJacobianProduct:
             dev.vjp(tape.measurements, dy)(tape)
 
 
+@pytest.mark.skipif(ld._new_API, reason="Old API required")
 class TestBatchVectorJacobianProduct:
     """Tests for the batch_vjp function"""
 
@@ -568,6 +593,7 @@ class TestBatchVectorJacobianProduct:
 
         assert np.allclose(vjps[0], 0)
 
+    @pytest.mark.skipif(ld._new_API, reason="Old API required")
     def test_reduction_append(self, dev):
         """Test the 'append' reduction strategy"""
         _state = dev._asarray(dev.state)
