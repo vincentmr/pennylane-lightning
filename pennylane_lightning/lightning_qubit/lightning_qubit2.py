@@ -80,7 +80,7 @@ def jacobian(circuit: QuantumTape, state: LightningStateVector, batch_obs=False)
         state (LightningStateVector): handle to Lightning state vector
         batch_obs (bool): Determine whether we process observables in parallel when
             computing the jacobian. This value is only relevant when the lightning
-            qubit is built with OpenMP.
+            qubit is built with OpenMP. Default is False.
 
     Returns:
         TensorLike: The Jacobian of the quantum script
@@ -99,7 +99,7 @@ def simulate_and_jacobian(circuit: QuantumTape, state: LightningStateVector, bat
         state (LightningStateVector): handle to Lightning state vector
         batch_obs (bool): Determine whether we process observables in parallel when
             computing the jacobian. This value is only relevant when the lightning
-            qubit is built with OpenMP.
+            qubit is built with OpenMP. Default is False.
 
     Returns:
         Tuple[TensorLike]: The results of the simulation and the calculated Jacobian
@@ -370,6 +370,7 @@ class LightningQubit2(Device):
     _CPP_BINARY_AVAILABLE = LQ_CPP_BINARY_AVAILABLE
     _new_API = True
 
+    # TODO: Move supported ops/obs to TOML file
     operations = _operations
     # The names of the supported operations.
 
@@ -388,7 +389,7 @@ class LightningQubit2(Device):
         num_burnin=100,
         batch_obs=False,
     ):
-        if not LQ_CPP_BINARY_AVAILABLE:
+        if not self._CPP_BINARY_AVAILABLE:
             raise ImportError(
                 "Pre-compiled binaries for lightning.qubit are not available. "
                 "To manually compile from source, follow the instructions at "
@@ -398,6 +399,8 @@ class LightningQubit2(Device):
         super().__init__(wires=wires, shots=shots)
 
         self._statevector = LightningStateVector(num_wires=len(self.wires), dtype=c_dtype)
+
+        # TODO: Investigate usefulness of creating numpy random generator
         seed = np.random.randint(0, high=10000000) if seed == "global" else seed
         self._rng = np.random.default_rng(seed)
 
