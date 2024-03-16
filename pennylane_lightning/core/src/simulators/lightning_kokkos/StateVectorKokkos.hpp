@@ -767,10 +767,27 @@ class StateVectorKokkos final
      * @param wire Wire to collapse.
      * @param branch Branch 0 or 1.
      */
-    void collapse([[maybe_unused]] const std::size_t wire, [[maybe_unused]] const bool branch) {
+    void collapse(const std::size_t wire, const bool branch) {
 
         // file:///home/thomas.germain/Downloads/KokkosTutorial_04_HierarchicalParallelism.pdf
         // pp. 14, 20, 26,
+
+        auto &&num_qubits = this->getNumQubits();
+
+        const size_t stride = pow(2, num_qubits_ - (1 + wire));
+        const size_t vec_size = pow(2, num_qubits_);
+        const auto section_size = vec_size / stride;
+        const auto half_section_size = section_size / 2;
+
+        const size_t negbranch = branch ? 0 : 1;
+
+        Kokkos::MDRangePolicy<DoubleLoopRank> policy_2d(
+            {0, 0}, {half_section_size, stride});
+        Kokkos::parallel_for(
+            policy_2d,
+            collapseFunctor<fp_t>(*data_, num_qubits, stride, negbranch));
+
+        // normalize();
     }
 
     /**

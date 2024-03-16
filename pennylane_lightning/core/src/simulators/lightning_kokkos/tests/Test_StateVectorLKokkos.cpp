@@ -310,8 +310,8 @@ TEMPLATE_TEST_CASE("StateVectorKokkos::StateVectorKokkos",
     }
 }
 
-TEMPLATE_TEST_CASE("StateVectorKokkos::collapse",
-                   "[StateVectorKokkos]", float, double) {
+TEMPLATE_TEST_CASE("StateVectorKokkos::collapse", "[StateVectorKokkos]", float,
+                   double) {
     using PrecisionT = TestType;
     using ComplexT = typename StateVectorKokkos<PrecisionT>::ComplexT;
     using TestVectorT = TestVector<ComplexT>;
@@ -340,10 +340,9 @@ TEMPLATE_TEST_CASE("StateVectorKokkos::collapse",
         std::size_t wire = GENERATE(0, 1, 2);
         std::size_t branch = GENERATE(0, 1);
         StateVectorKokkos<PrecisionT> sv(
-                reinterpret_cast<ComplexT *>(init_state.data()), init_state.size());
+            reinterpret_cast<ComplexT *>(init_state.data()), init_state.size());
         sv.collapse(wire, branch);
 
         REQUIRE(sv.getDataVector() == expected_state[branch][wire]);
     }
 }
-
