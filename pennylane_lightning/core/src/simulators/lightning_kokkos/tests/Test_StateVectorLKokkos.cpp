@@ -318,8 +318,7 @@ TEMPLATE_TEST_CASE("StateVectorKokkos::collapse", "[StateVectorKokkos]", float,
 
     const std::size_t num_qubits = 3;
 
-    // TODO @tomlqc what about having same template for testing all Lightning
-    // flavours?
+    // TODO @tomlqc use same template for testing all Lightning flavours?
 
     SECTION("Collapse the state vector as after having measured one of the "
             "qubits.") {
@@ -343,6 +342,9 @@ TEMPLATE_TEST_CASE("StateVectorKokkos::collapse", "[StateVectorKokkos]", float,
             reinterpret_cast<ComplexT *>(init_state.data()), init_state.size());
         sv.collapse(wire, branch);
 
-        REQUIRE(sv.getDataVector() == expected_state[branch][wire]);
+        PrecisionT eps = std::numeric_limits<PrecisionT>::epsilon() * 10e3;
+        REQUIRE(isApproxEqual(sv.getData(), sv.getDataVector().size(),
+                              expected_state[branch][wire].data(),
+                              expected_state[branch][wire].size(), eps));
     }
 }

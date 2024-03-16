@@ -787,7 +787,31 @@ class StateVectorKokkos final
             policy_2d,
             collapseFunctor<fp_t>(*data_, num_qubits, stride, negbranch));
 
-        // normalize();
+        normalize();
+    }
+
+    /**
+     * @brief Normalize vector (to have norm 1).
+     */
+    void normalize() {
+        KokkosVector sv_view =
+            getView(); // circumvent error capturing this with KOKKOS_LAMBDA
+
+        // TODO: @tomlqc what about squaredNorm()
+        PrecisionT squaredNorm = 0.0;
+        Kokkos::parallel_reduce(
+            sv_view.size(),
+            KOKKOS_LAMBDA(const size_t i, PrecisionT &sum) {
+                sum += std::norm<PrecisionT>(sv_view(i));
+            },
+            squaredNorm);
+
+        // TODO: @tomlqc add PL_ABORT_IF
+
+        std::complex<PrecisionT> inv_norm = 1. / std::sqrt(squaredNorm);
+        Kokkos::parallel_for(
+            sv_view.size(),
+            KOKKOS_LAMBDA(const size_t i) { sv_view(i) *= inv_norm; });
     }
 
     /**
